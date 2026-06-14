@@ -1,2 +1,10 @@
+# binaries
 VileFile
-VileFile
+
+# test files
+testing_1.0
+testing_1.0.cpp
+test_runner
+
+# object files
+*.o

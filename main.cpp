@@ -1,12 +1,17 @@
 #include <wx/wx.h>
+#include "model.hpp"
+#include "view.hpp"
 
 class VileApp : public wxApp {
+    FileSystemModel m_model;
+
 public:
-  bool OnInit() override {
-    wxFrame *f = new wxFrame(nullptr, wxID_ANY, "VileFile", wxDefaultPosition,
-                             wxSize(900, 600));
-    f->Show(true);
-    return true;
-  }
+    bool OnInit() override {
+        auto *frame = new MainFrame("VileFile", &m_model);
+        frame->setupColumns();
+        frame->initializeTree(FileSystemModel::getRootPath());
+        frame->Show(true);
+        return true;
+    }
 };
 wxIMPLEMENT_APP(VileApp);
