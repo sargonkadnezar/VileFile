@@ -145,6 +145,7 @@ MainFrame::MainFrame(const wxString &title, FileSystemModel *model)
   // Events
   m_tree->Bind(wxEVT_TREE_ITEM_EXPANDING, &MainFrame::onTreeExpanding, this);
   m_tree->Bind(wxEVT_TREE_SEL_CHANGED, &MainFrame::onTreeSelChanged, this);
+  m_list->Bind(wxEVT_LIST_ITEM_SELECTED, &MainFrame::onListSelected, this);
   m_list->Bind(wxEVT_LIST_ITEM_ACTIVATED, &MainFrame::onListActivated, this);
   m_list->Bind(wxEVT_LIST_COL_CLICK, &MainFrame::onColumnClick, this);
   m_list->Bind(wxEVT_CHAR_HOOK, &MainFrame::onKeyDown, this);
@@ -222,7 +223,7 @@ void MainFrame::setupColumns() {
 void MainFrame::pushHistoryEntry(std::vector<std::string> &history,
                                  size_t &pos, bool isNav,
                                  const std::string &path) {
-  if (!isNav) {
+  if (!isNav && (history.empty() || history[pos] != path)) {
     history.resize(pos + 1);
     history.push_back(path);
     pos = history.size() - 1;
@@ -347,8 +348,10 @@ void MainFrame::onTreeSelChanged(wxTreeEvent &event) {
   event.Skip();
 }
 
-void MainFrame::onListActivated(wxListEvent &event) {
-  long idx = m_list->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+void MainFrame::onListSelected(wxListEvent &event) {
+  long idx = event.GetIndex();
+  if (idx < 0)
+    idx = m_list->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
   if (idx < 0)
     return;
 
@@ -358,9 +361,29 @@ void MainFrame::onListActivated(wxListEvent &event) {
 
   const auto &fd = m_currentFiles[fileIndex];
 
-  if (fd.name == ".." || fd.isDirectory) {
+  if (fd.name == "..") {
+    std::string parent = fs::path(m_currentPath).parent_path().string();
+    if (!parent.empty())
+      navigateTo(parent);
+  } else if (fd.isDirectory) {
     navigateTo(fd.fullPath);
-  } else {
+  }
+}
+
+void MainFrame::onListActivated(wxListEvent &event) {
+  long idx = event.GetIndex();
+  if (idx < 0)
+    idx = m_list->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  if (idx < 0)
+    return;
+
+  size_t fileIndex = static_cast<size_t>(m_list->GetItemData(idx));
+  if (fileIndex >= m_currentFiles.size())
+    return;
+
+  const auto &fd = m_currentFiles[fileIndex];
+
+  if (!fd.isDirectory && fd.name != "..") {
     wxLaunchDefaultApplication(wxString(fd.fullPath));
   }
 }

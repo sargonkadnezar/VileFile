@@ -167,6 +167,22 @@ TEST_CASE("history back/forward flag suppresses push") {
   CHECK(pos == 2);
 }
 
+TEST_CASE("history skips duplicate consecutive entries") {
+  std::vector<std::string> history = {"/"};
+  size_t pos = 0;
+
+  MainFrame::pushHistoryEntry(history, pos, false, "/boot");
+  CHECK(history.size() == 2);
+
+  MainFrame::pushHistoryEntry(history, pos, false, "/boot");
+  CHECK(history.size() == 2);
+  CHECK(pos == 1);
+
+  MainFrame::pushHistoryEntry(history, pos, false, "/boot/grub");
+  CHECK(history.size() == 3);
+  CHECK(pos == 2);
+}
+
 TEST_CASE(".. double-click pushes parent and Back returns to child") {
   std::vector<std::string> history = {"/"};
   size_t pos = 0;

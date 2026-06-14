@@ -46,6 +46,7 @@ public:
 private:
   void onTreeExpanding(wxTreeEvent &event);
   void onTreeSelChanged(wxTreeEvent &event);
+  void onListSelected(wxListEvent &event);
   void onListActivated(wxListEvent &event);
   void onRefresh(wxCommandEvent &event);
   void onDelete(wxCommandEvent &event);
