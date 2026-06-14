@@ -257,10 +257,7 @@ void MainFrame::initializeTree(const std::string &rootPath) {
     addTreeChild(rootId, subPath);
   }
   m_tree->Expand(rootId);
-
-  m_navHistory.push_back(rootPath);
-  m_navPos = 0;
-  updateToolbarState();
+  navigateTo(rootPath);
 }
 
 wxString MainFrame::formatSize(uintmax_t bytes, bool isDir) {
