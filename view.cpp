@@ -1,6 +1,8 @@
 #include "view.hpp"
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
+#include <unordered_map>
 #include <wx/artprov.h>
 
 namespace fs = std::filesystem;
@@ -13,6 +15,45 @@ void sortSubDirectories(std::vector<std::string> &dirs) {
                   std::filesystem::path(a).filename().string(),
                   std::filesystem::path(b).filename().string());
             });
+}
+
+wxString detectFileType(const std::string &name, bool isDir) {
+  if (isDir)
+    return "File Folder";
+  std::string ext = fs::path(name).extension().string();
+  std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+  static const std::unordered_map<std::string, wxString> map = {
+      {".cpp", "C++ Source"},    {".hpp", "C++ Header"},
+      {".h", "C Header"},        {".cc", "C++ Source"},
+      {".cxx", "C++ Source"},    {".c", "C Source"},
+      {".png", "PNG Image"},     {".jpg", "JPEG Image"},
+      {".jpeg", "JPEG Image"},   {".gif", "GIF Image"},
+      {".bmp", "BMP Image"},     {".svg", "SVG Image"},
+      {".ico", "Icon"},          {".pdf", "PDF Document"},
+      {".txt", "Text File"},     {".md", "Markdown"},
+      {".log", "Log File"},      {".csv", "CSV File"},
+      {".xml", "XML File"},      {".json", "JSON File"},
+      {".html", "HTML File"},    {".css", "CSS File"},
+      {".js", "JavaScript"},     {".ts", "TypeScript"},
+      {".py", "Python Source"},  {".rs", "Rust Source"},
+      {".zip", "Archive"},       {".tar", "Archive"},
+      {".gz", "Archive"},        {".7z", "Archive"},
+      {".mp3", "Audio"},         {".wav", "Audio"},
+      {".flac", "Audio"},        {".mp4", "Video"},
+      {".mkv", "Video"},         {".avi", "Video"},
+      {".ttf", "Font"},          {".otf", "Font"},
+      {".sh", "Shell Script"},   {".bash", "Shell Script"},
+      {".toml", "TOML File"},    {".yaml", "YAML File"},
+      {".yml", "YAML File"},     {".lock", "Lock File"},
+  };
+
+  auto it = map.find(ext);
+  if (it != map.end())
+    return it->second;
+  if (!ext.empty())
+    return ext.substr(1) + " File";
+  return "File";
 }
 } // namespace
 
@@ -46,6 +87,10 @@ bool MainFrame::compareFileData(const FileData &a, const FileData &b) const {
     result = (a.dateModified.empty() ? "9999-99-99" : a.dateModified) <
              (b.dateModified.empty() ? "9999-99-99" : b.dateModified);
     break;
+
+  case 4: // Permissions
+    result = a.permissions < b.permissions;
+    break;
   }
 
   return m_sortAscending ? result : !result;
@@ -76,6 +121,11 @@ MainFrame::MainFrame(const wxString &title, FileSystemModel *model)
   m_splitter->SplitVertically(m_tree, m_list, GetSize().GetWidth() * 0.3);
   m_status = CreateStatusBar(1);
 
+  m_imageList = new wxImageList(16, 16);
+  m_imageList->Add(wxArtProvider::GetBitmap(wxART_FOLDER, wxART_LIST, wxSize(16, 16)));
+  m_imageList->Add(wxArtProvider::GetBitmap(wxART_NORMAL_FILE, wxART_LIST, wxSize(16, 16)));
+  m_list->SetImageList(m_imageList, wxIMAGE_LIST_SMALL);
+
   wxBoxSizer *sizer = new wxBoxSizer(wxVERTICAL);
   sizer->Add(m_splitter, 1, wxEXPAND);
   SetSizer(sizer);
@@ -90,14 +140,14 @@ MainFrame::MainFrame(const wxString &title, FileSystemModel *model)
   Bind(wxEVT_MENU, &MainFrame::onRefresh, this, wxID_REFRESH);
   Bind(wxEVT_MENU, &MainFrame::onDelete, this, ID_PERMANENT_DELETE);
 }
-// destructor handles by default, no need for anything
-MainFrame::~MainFrame() {}
+MainFrame::~MainFrame() { delete m_imageList; }
 
 void MainFrame::setupColumns() {
   m_list->InsertColumn(0, "Name", wxLIST_FORMAT_LEFT, 300);
   m_list->InsertColumn(1, "Size", wxLIST_FORMAT_RIGHT, 100);
   m_list->InsertColumn(2, "Type", wxLIST_FORMAT_LEFT, 100);
   m_list->InsertColumn(3, "Date Modified", wxLIST_FORMAT_LEFT, 150);
+  m_list->InsertColumn(4, "Permissions", wxLIST_FORMAT_LEFT, 110);
 }
 
 void MainFrame::addTreeChild(const wxTreeItemId &parent,
@@ -126,12 +176,18 @@ wxString MainFrame::formatSize(uintmax_t bytes, bool isDir) const {
   if (isDir)
     return "--";
   if (bytes < 1024)
-    return wxString::Format("%llu B", bytes);
+    return wxString::Format("%llu B",
+                            static_cast<unsigned long long>(bytes));
   if (bytes < 1024 * 1024)
-    return wxString::Format("%.1f KB", bytes / 1024.0);
+    return wxString::Format("%.1f KB",
+                            static_cast<unsigned long long>(bytes) / 1024.0);
   if (bytes < 1024 * 1024 * 1024)
-    return wxString::Format("%.1f MB", bytes / (1024.0 * 1024.0));
-  return wxString::Format("%.1f GB", bytes / (1024.0 * 1024.0 * 1024.0));
+    return wxString::Format("%.1f MB",
+                            static_cast<unsigned long long>(bytes) /
+                                (1024.0 * 1024.0));
+  return wxString::Format("%.1f GB",
+                          static_cast<unsigned long long>(bytes) /
+                              (1024.0 * 1024.0 * 1024.0));
 }
 
 void MainFrame::updateListView(const std::vector<FileData> &files,
@@ -142,7 +198,7 @@ void MainFrame::updateListView(const std::vector<FileData> &files,
   if (currentPath != "/" && !currentPath.empty()) {
     m_currentFiles.insert(
         m_currentFiles.begin(),
-        {"..", fs::path(currentPath).parent_path().string(), true, 0, ""});
+        {"..", fs::path(currentPath).parent_path().string(), true, 0, "", ""});
   }
 
   size_t startIdx =
@@ -156,10 +212,11 @@ void MainFrame::updateListView(const std::vector<FileData> &files,
   m_list->DeleteAllItems();
   for (size_t i = 0; i < m_currentFiles.size(); ++i) {
     const auto &fd = m_currentFiles[i];
-    long idx = m_list->InsertItem(i, fd.name);
+    long idx = m_list->InsertItem(i, fd.name, fd.isDirectory ? 0 : 1);
     m_list->SetItem(idx, 1, formatSize(fd.size, fd.isDirectory));
-    m_list->SetItem(idx, 2, fd.isDirectory ? "Directory" : "File");
+    m_list->SetItem(idx, 2, detectFileType(fd.name, fd.isDirectory));
     m_list->SetItem(idx, 3, fd.dateModified);
+    m_list->SetItem(idx, 4, fd.permissions);
     m_list->SetItemPtrData(idx, static_cast<wxUIntPtr>(i));
   }
   m_list->Thaw();

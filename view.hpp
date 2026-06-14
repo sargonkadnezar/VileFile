@@ -52,6 +52,7 @@ private:
   wxListCtrl *m_list = nullptr;
   wxStatusBar *m_status = nullptr;
   wxToolBar *m_toolbar = nullptr;
+  wxImageList *m_imageList = nullptr;
 
   FileSystemModel *m_model = nullptr;
 

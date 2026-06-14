@@ -6,6 +6,23 @@
 
 namespace fs = std::filesystem;
 
+static std::string permsToString(fs::perms p) {
+  auto r = [](fs::perms m) -> char { return (m != fs::perms::none) ? 'r' : '-'; };
+  auto w = [](fs::perms m) -> char { return (m != fs::perms::none) ? 'w' : '-'; };
+  auto x = [](fs::perms m) -> char { return (m != fs::perms::none) ? 'x' : '-'; };
+  std::string s;
+  s += r(p & fs::perms::owner_read);
+  s += w(p & fs::perms::owner_write);
+  s += x(p & fs::perms::owner_exec);
+  s += r(p & fs::perms::group_read);
+  s += w(p & fs::perms::group_write);
+  s += x(p & fs::perms::group_exec);
+  s += r(p & fs::perms::others_read);
+  s += w(p & fs::perms::others_write);
+  s += x(p & fs::perms::others_exec);
+  return s;
+}
+
 // this is really horrible, why is time like that
 static std::string getTimeString(fs::file_time_type ftime) {
   using namespace std::chrono;
@@ -36,8 +53,10 @@ FileSystemModel::getDirectoryContents(const std::string &path) {
       if (auto ftime = entry.last_write_time(ec); !ec)
         dateStr = getTimeString(ftime);
 
+      std::string permStr = permsToString(entry.status(ec).permissions());
+
       result.push_back({entry.path().filename().string(), entry.path().string(),
-                        isDir, size, dateStr});
+                        isDir, size, dateStr, permStr});
     }
   } catch (const fs::filesystem_error &) {
   }

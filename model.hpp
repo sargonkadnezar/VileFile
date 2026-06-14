@@ -11,6 +11,7 @@ struct FileData {
   bool isDirectory;
   uintmax_t size;
   std::string dateModified;
+  std::string permissions;
 };
 
 class FileSystemModel {
