@@ -15,7 +15,7 @@ struct FileData {
 
 class FileSystemModel {
 public:
-  static std::string getRootPath();
+  static std::string getRootPath() { return "/"; };
   std::vector<FileData> getDirectoryContents(const std::string &path);
   std::vector<std::string> getSubDirectories(const std::string &path);
 };
