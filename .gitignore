@@ -1,6 +1,9 @@
 # binaries
 VileFile
 
+# build directory
+build/
+
 # test files
 testing_1.0
 testing_1.0.cpp

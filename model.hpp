@@ -2,6 +2,7 @@
 #define VILEFILE_MODEL_H
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -13,6 +14,9 @@ struct FileData {
   std::string dateModified;
   std::string permissions;
 };
+
+std::string permsToString(std::filesystem::perms p);
+std::string getTimeString(std::filesystem::file_time_type ftime);
 
 class FileSystemModel {
 public:

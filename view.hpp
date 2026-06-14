@@ -19,6 +19,10 @@ public:
 };
 
 constexpr int ID_PERMANENT_DELETE = wxID_HIGHEST + 1;
+constexpr int ID_NAV_BACK = wxID_HIGHEST + 2;
+constexpr int ID_NAV_FORWARD = wxID_HIGHEST + 3;
+constexpr int ID_NAV_UP = wxID_HIGHEST + 4;
+constexpr int ID_NEW_FOLDER = wxID_HIGHEST + 5;
 
 class MainFrame : public wxFrame {
 public:
@@ -30,8 +34,12 @@ public:
   void updateListView(const std::vector<FileData> &files,
                       const std::string &currentPath);
 
+  static wxString formatSize(uintmax_t bytes, bool isDir);
+  static wxString detectFileType(const std::string &name, bool isDir);
   static bool compareNamesCaseInsensitive(const std::string &a,
                                           const std::string &b);
+  static bool compareFileData(const FileData &a, const FileData &b,
+                              int sortColumn, bool sortAscending);
 
 private:
   void onTreeExpanding(wxTreeEvent &event);
@@ -43,16 +51,30 @@ private:
   void onColumnClick(wxListEvent &event);
   void onKeyDown(wxKeyEvent &event);
   void doRefresh();
-  wxString formatSize(uintmax_t bytes, bool isDir) const;
   void addTreeChild(const wxTreeItemId &parent, const std::string &path);
-  bool compareFileData(const FileData &a, const FileData &b) const;
+  void navigateTo(const std::string &path);
+  void updateToolbarState();
+  void onNavigateBack(wxCommandEvent &event);
+  void onNavigateForward(wxCommandEvent &event);
+  void onNavigateUp(wxCommandEvent &event);
+  void onNewFolder(wxCommandEvent &event);
+  void createMenuBar();
+  void onAbout(wxCommandEvent &event);
+  void onExit(wxCommandEvent &event);
+  void onSortBy(wxCommandEvent &event);
 
   wxSplitterWindow *m_splitter = nullptr;
   wxTreeCtrl *m_tree = nullptr;
   wxListCtrl *m_list = nullptr;
   wxStatusBar *m_status = nullptr;
   wxToolBar *m_toolbar = nullptr;
+  wxToolBarToolBase *m_backBtn = nullptr;
+  wxToolBarToolBase *m_forwardBtn = nullptr;
   wxImageList *m_imageList = nullptr;
+
+  std::vector<std::string> m_navHistory;
+  size_t m_navPos = 0;
+  bool m_isHistoryNavigation = false;
 
   FileSystemModel *m_model = nullptr;
 

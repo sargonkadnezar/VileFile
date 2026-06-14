@@ -6,7 +6,7 @@
 
 namespace fs = std::filesystem;
 
-static std::string permsToString(fs::perms p) {
+std::string permsToString(fs::perms p) {
   auto r = [](fs::perms m) -> char { return (m != fs::perms::none) ? 'r' : '-'; };
   auto w = [](fs::perms m) -> char { return (m != fs::perms::none) ? 'w' : '-'; };
   auto x = [](fs::perms m) -> char { return (m != fs::perms::none) ? 'x' : '-'; };
@@ -23,8 +23,8 @@ static std::string permsToString(fs::perms p) {
   return s;
 }
 
-// this is really horrible, why is time like that
-static std::string getTimeString(fs::file_time_type ftime) {
+/// Convert file_time_type to ISO datetime string
+std::string getTimeString(fs::file_time_type ftime) {
   using namespace std::chrono;
   auto sysTime = time_point_cast<system_clock::duration>(
       ftime - fs::file_time_type::clock::now() + system_clock::now());
@@ -33,7 +33,6 @@ static std::string getTimeString(fs::file_time_type ftime) {
   oss << std::put_time(std::localtime(&tt), "%Y-%m-%d %H:%M");
   return oss.str();
 }
-// supercooler iterator
 std::vector<FileData>
 FileSystemModel::getDirectoryContents(const std::string &path) {
   std::vector<FileData> result;
@@ -42,7 +41,8 @@ FileSystemModel::getDirectoryContents(const std::string &path) {
              path, fs::directory_options::skip_permission_denied)) {
       std::error_code ec;
       bool isDir = entry.is_directory(ec);
-      if (ec || (!isDir && !entry.is_regular_file(ec)))
+      bool isSym = entry.is_symlink(ec);
+      if (ec || isSym || (!isDir && !entry.is_regular_file(ec)))
         continue;
 
       uintmax_t size = isDir ? 0 : entry.file_size(ec);
@@ -62,7 +62,6 @@ FileSystemModel::getDirectoryContents(const std::string &path) {
   }
   return result;
 }
-// noch cooleres iterieren
 std::vector<std::string>
 FileSystemModel::getSubDirectories(const std::string &path) {
   std::vector<std::string> out;

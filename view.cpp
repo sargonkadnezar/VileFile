@@ -16,8 +16,9 @@ void sortSubDirectories(std::vector<std::string> &dirs) {
                   std::filesystem::path(b).filename().string());
             });
 }
+} // namespace
 
-wxString detectFileType(const std::string &name, bool isDir) {
+wxString MainFrame::detectFileType(const std::string &name, bool isDir) {
   if (isDir)
     return "File Folder";
   std::string ext = fs::path(name).extension().string();
@@ -55,17 +56,17 @@ wxString detectFileType(const std::string &name, bool isDir) {
     return ext.substr(1) + " File";
   return "File";
 }
-} // namespace
 
 bool MainFrame::compareNamesCaseInsensitive(const std::string &a,
                                             const std::string &b) {
   return wxString(a).CmpNoCase(wxString(b)) < 0;
 }
 
-bool MainFrame::compareFileData(const FileData &a, const FileData &b) const {
+bool MainFrame::compareFileData(const FileData &a, const FileData &b,
+                                int sortColumn, bool sortAscending) {
   bool result = false;
 
-  switch (m_sortColumn) {
+  switch (sortColumn) {
   case 0: // Name
   case 2: //
     if (a.isDirectory != b.isDirectory)
@@ -93,7 +94,7 @@ bool MainFrame::compareFileData(const FileData &a, const FileData &b) const {
     break;
   }
 
-  return m_sortAscending ? result : !result;
+  return sortAscending ? result : !result;
 }
 
 MainFrame::MainFrame(const wxString &title, FileSystemModel *model)
@@ -102,8 +103,17 @@ MainFrame::MainFrame(const wxString &title, FileSystemModel *model)
   SetMinSize(wxSize(600, 400));
 
   m_toolbar = CreateToolBar(wxTB_HORIZONTAL | wxTB_TEXT);
+  m_backBtn = m_toolbar->AddTool(ID_NAV_BACK, "Back",
+                                 wxArtProvider::GetBitmap(wxART_GO_BACK));
+  m_forwardBtn = m_toolbar->AddTool(ID_NAV_FORWARD, "Forward",
+                                    wxArtProvider::GetBitmap(wxART_GO_FORWARD));
+  m_toolbar->AddTool(ID_NAV_UP, "Up",
+                     wxArtProvider::GetBitmap(wxART_GO_DIR_UP));
   m_toolbar->AddTool(wxID_REFRESH, "Refresh",
                      wxArtProvider::GetBitmap(wxART_REDO));
+  m_toolbar->AddTool(ID_NEW_FOLDER, "New Folder",
+                     wxArtProvider::GetBitmap(wxART_NEW_DIR));
+  m_toolbar->AddSeparator();
   m_toolbar->AddTool(ID_PERMANENT_DELETE, "Delete",
                      wxArtProvider::GetBitmap(wxART_CROSS_MARK));
   m_toolbar->Realize();
@@ -119,7 +129,9 @@ MainFrame::MainFrame(const wxString &title, FileSystemModel *model)
                           wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
 
   m_splitter->SplitVertically(m_tree, m_list, GetSize().GetWidth() * 0.3);
-  m_status = CreateStatusBar(1);
+  m_status = CreateStatusBar(2);
+  int widths[] = {-1, 150};
+  m_status->SetStatusWidths(2, widths);
 
   m_imageList = new wxImageList(16, 16);
   m_imageList->Add(wxArtProvider::GetBitmap(wxART_FOLDER, wxART_LIST, wxSize(16, 16)));
@@ -139,8 +151,65 @@ MainFrame::MainFrame(const wxString &title, FileSystemModel *model)
   this->Bind(wxEVT_CHAR_HOOK, &MainFrame::onKeyDown, this);
   Bind(wxEVT_MENU, &MainFrame::onRefresh, this, wxID_REFRESH);
   Bind(wxEVT_MENU, &MainFrame::onDelete, this, ID_PERMANENT_DELETE);
+  Bind(wxEVT_MENU, &MainFrame::onNavigateBack, this, ID_NAV_BACK);
+  Bind(wxEVT_MENU, &MainFrame::onNavigateForward, this, ID_NAV_FORWARD);
+  Bind(wxEVT_MENU, &MainFrame::onNavigateUp, this, ID_NAV_UP);
+  Bind(wxEVT_MENU, &MainFrame::onNewFolder, this, ID_NEW_FOLDER);
+
+  createMenuBar();
+  Bind(wxEVT_MENU, &MainFrame::onAbout, this, wxID_ABOUT);
+  Bind(wxEVT_MENU, &MainFrame::onExit, this, wxID_EXIT);
+  Bind(wxEVT_MENU, &MainFrame::onSortBy, this, wxID_HIGHEST + 10);
+  Bind(wxEVT_MENU, &MainFrame::onSortBy, this, wxID_HIGHEST + 11);
+  Bind(wxEVT_MENU, &MainFrame::onSortBy, this, wxID_HIGHEST + 12);
+  Bind(wxEVT_MENU, &MainFrame::onSortBy, this, wxID_HIGHEST + 13);
+  Bind(wxEVT_MENU, &MainFrame::onSortBy, this, wxID_HIGHEST + 14);
 }
 MainFrame::~MainFrame() { delete m_imageList; }
+
+void MainFrame::createMenuBar() {
+  auto *menuBar = new wxMenuBar;
+  auto *fileMenu = new wxMenu;
+  fileMenu->Append(ID_NEW_FOLDER, "New Folder\tCtrl+N");
+  fileMenu->AppendSeparator();
+  fileMenu->Append(wxID_EXIT, "Exit\tCtrl+Q");
+  menuBar->Append(fileMenu, "&File");
+  auto *editMenu = new wxMenu;
+  editMenu->Append(ID_PERMANENT_DELETE, "Delete\tDel");
+  editMenu->Append(wxID_REFRESH, "Refresh\tF5");
+  menuBar->Append(editMenu, "&Edit");
+  auto *viewMenu = new wxMenu;
+  viewMenu->Append(wxID_HIGHEST + 10, "Sort by Name");
+  viewMenu->Append(wxID_HIGHEST + 11, "Sort by Size");
+  viewMenu->Append(wxID_HIGHEST + 12, "Sort by Type");
+  viewMenu->Append(wxID_HIGHEST + 13, "Sort by Date");
+  viewMenu->Append(wxID_HIGHEST + 14, "Sort by Permissions");
+  menuBar->Append(viewMenu, "&View");
+  auto *toolsMenu = new wxMenu;
+  menuBar->Append(toolsMenu, "&Tools");
+  auto *helpMenu = new wxMenu;
+  helpMenu->Append(wxID_ABOUT, "About VileFile...");
+  menuBar->Append(helpMenu, "&Help");
+
+  SetMenuBar(menuBar);
+}
+
+void MainFrame::onAbout(wxCommandEvent &) {
+  wxMessageBox("VileFile v1.0\n\nA simple cross-platform file manager.\nBuilt with wxWidgets and C++17.",
+               "About VileFile", wxOK | wxICON_INFORMATION);
+}
+
+void MainFrame::onExit(wxCommandEvent &) {
+  Close(true);
+}
+
+void MainFrame::onSortBy(wxCommandEvent &event) {
+  int id = event.GetId();
+  int col = id - (wxID_HIGHEST + 10);
+  m_sortAscending = (col == m_sortColumn) ? !m_sortAscending : true;
+  m_sortColumn = col;
+  updateListView(m_currentFiles, m_currentPath);
+}
 
 void MainFrame::setupColumns() {
   m_list->InsertColumn(0, "Name", wxLIST_FORMAT_LEFT, 300);
@@ -148,6 +217,24 @@ void MainFrame::setupColumns() {
   m_list->InsertColumn(2, "Type", wxLIST_FORMAT_LEFT, 100);
   m_list->InsertColumn(3, "Date Modified", wxLIST_FORMAT_LEFT, 150);
   m_list->InsertColumn(4, "Permissions", wxLIST_FORMAT_LEFT, 110);
+}
+
+void MainFrame::navigateTo(const std::string &path) {
+  if (!m_isHistoryNavigation) {
+    m_navHistory.resize(m_navPos + 1);
+    m_navHistory.push_back(path);
+    m_navPos = m_navHistory.size() - 1;
+  }
+  if (auto it = m_pathToTreeItem.find(path); it != m_pathToTreeItem.end()) {
+    m_tree->SelectItem(it->second);
+  }
+  updateListView(m_model->getDirectoryContents(path), path);
+  updateToolbarState();
+}
+
+void MainFrame::updateToolbarState() {
+  m_backBtn->Enable(m_navPos > 0);
+  m_forwardBtn->Enable(m_navPos + 1 < m_navHistory.size());
 }
 
 void MainFrame::addTreeChild(const wxTreeItemId &parent,
@@ -170,9 +257,13 @@ void MainFrame::initializeTree(const std::string &rootPath) {
     addTreeChild(rootId, subPath);
   }
   m_tree->Expand(rootId);
+
+  m_navHistory.push_back(rootPath);
+  m_navPos = 0;
+  updateToolbarState();
 }
 
-wxString MainFrame::formatSize(uintmax_t bytes, bool isDir) const {
+wxString MainFrame::formatSize(uintmax_t bytes, bool isDir) {
   if (isDir)
     return "--";
   if (bytes < 1024)
@@ -181,13 +272,17 @@ wxString MainFrame::formatSize(uintmax_t bytes, bool isDir) const {
   if (bytes < 1024 * 1024)
     return wxString::Format("%.1f KB",
                             static_cast<unsigned long long>(bytes) / 1024.0);
-  if (bytes < 1024 * 1024 * 1024)
+  if (bytes < 1024UL * 1024 * 1024)
     return wxString::Format("%.1f MB",
                             static_cast<unsigned long long>(bytes) /
                                 (1024.0 * 1024.0));
-  return wxString::Format("%.1f GB",
+  if (bytes < 1024UL * 1024 * 1024 * 1024)
+    return wxString::Format("%.1f GB",
+                            static_cast<unsigned long long>(bytes) /
+                                (1024.0 * 1024.0 * 1024.0));
+  return wxString::Format("%.1f TB",
                           static_cast<unsigned long long>(bytes) /
-                              (1024.0 * 1024.0 * 1024.0));
+                              (1024.0 * 1024.0 * 1024.0 * 1024.0));
 }
 
 void MainFrame::updateListView(const std::vector<FileData> &files,
@@ -205,7 +300,7 @@ void MainFrame::updateListView(const std::vector<FileData> &files,
       (!m_currentFiles.empty() && m_currentFiles[0].name == "..") ? 1 : 0;
   std::stable_sort(m_currentFiles.begin() + startIdx, m_currentFiles.end(),
                    [this](const FileData &a, const FileData &b) {
-                     return compareFileData(a, b);
+                     return compareFileData(a, b, m_sortColumn, m_sortAscending);
                    });
 
   m_list->Freeze();
@@ -220,8 +315,8 @@ void MainFrame::updateListView(const std::vector<FileData> &files,
     m_list->SetItemPtrData(idx, static_cast<wxUIntPtr>(i));
   }
   m_list->Thaw();
-  m_status->SetStatusText(wxString::Format(
-      "VileFile: %s  (%zu items)", m_currentPath, m_currentFiles.size()));
+  m_status->SetStatusText(wxString::Format("VileFile: %s", m_currentPath), 0);
+  m_status->SetStatusText(wxString::Format("%zu items", m_currentFiles.size()), 1);
 }
 
 void MainFrame::onTreeExpanding(wxTreeEvent &event) {
@@ -247,8 +342,7 @@ void MainFrame::onTreeExpanding(wxTreeEvent &event) {
 void MainFrame::onTreeSelChanged(wxTreeEvent &event) {
   if (auto *data = dynamic_cast<TreeItemPathData *>(
           m_tree->GetItemData(event.GetItem()))) {
-    updateListView(m_model->getDirectoryContents(data->GetFullPath()),
-                   data->GetFullPath());
+    navigateTo(data->GetFullPath());
   }
 }
 
@@ -357,5 +451,40 @@ void MainFrame::onKeyDown(wxKeyEvent &event) {
     doRefresh();
   } else {
     event.Skip();
+  }
+}
+
+void MainFrame::onNavigateBack(wxCommandEvent &event) {
+  if (m_navPos > 0) {
+    m_isHistoryNavigation = true;
+    --m_navPos;
+    navigateTo(m_navHistory[m_navPos]);
+    m_isHistoryNavigation = false;
+  }
+}
+
+void MainFrame::onNavigateForward(wxCommandEvent &event) {
+  if (m_navPos + 1 < m_navHistory.size()) {
+    m_isHistoryNavigation = true;
+    ++m_navPos;
+    navigateTo(m_navHistory[m_navPos]);
+    m_isHistoryNavigation = false;
+  }
+}
+
+void MainFrame::onNavigateUp(wxCommandEvent &event) {
+  navigateTo(fs::path(m_currentPath).parent_path().string());
+}
+
+void MainFrame::onNewFolder(wxCommandEvent &event) {
+  wxTextEntryDialog dlg(this, "Enter folder name:", "New Folder");
+  if (dlg.ShowModal() == wxID_OK) {
+    fs::path safe = fs::path(m_currentPath) / dlg.GetValue().ToStdString();
+    try {
+      fs::create_directory(safe);
+      doRefresh();
+    } catch (const fs::filesystem_error &e) {
+      wxMessageBox(e.what(), "Error", wxOK | wxICON_ERROR);
+    }
   }
 }
