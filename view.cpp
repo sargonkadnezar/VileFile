@@ -7,14 +7,14 @@ namespace fs = std::filesystem;
 
 namespace {
 void sortSubDirectories(std::vector<std::string> &dirs) {
-    std::sort(dirs.begin(), dirs.end(),
-        [](const std::string &a, const std::string &b) {
-            return MainFrame::compareNamesCaseInsensitive(
-                std::filesystem::path(a).filename().string(),
-                std::filesystem::path(b).filename().string());
-        });
+  std::sort(dirs.begin(), dirs.end(),
+            [](const std::string &a, const std::string &b) {
+              return MainFrame::compareNamesCaseInsensitive(
+                  std::filesystem::path(a).filename().string(),
+                  std::filesystem::path(b).filename().string());
+            });
 }
-}
+} // namespace
 
 bool MainFrame::compareNamesCaseInsensitive(const std::string &a,
                                             const std::string &b) {
@@ -163,10 +163,9 @@ void MainFrame::updateListView(const std::vector<FileData> &files,
     m_list->SetItemPtrData(idx, static_cast<wxUIntPtr>(i));
   }
   m_list->Thaw();
-  m_status->SetStatusText(wxString::Format("%zu items", m_currentFiles.size()));
+  m_status->SetStatusText(wxString::Format(
+      "VileFile: %s  (%zu items)", m_currentPath, m_currentFiles.size()));
 }
-
-// ── event handlers ──────────────────────────────────────────────────
 
 void MainFrame::onTreeExpanding(wxTreeEvent &event) {
   wxTreeItemId itemId = event.GetItem();
@@ -177,9 +176,8 @@ void MainFrame::onTreeExpanding(wxTreeEvent &event) {
   wxTreeItemIdValue cookie;
   wxTreeItemId firstChild = m_tree->GetFirstChild(itemId, cookie);
 
-  // Wenn es der Dummy ist, laden wir die echten Unterordner
   if (firstChild.IsOk() && m_tree->GetItemText(firstChild) == "dummy") {
-    m_tree->Delete(firstChild); // Löscht den Dummy sauber
+    m_tree->Delete(firstChild);
     auto subDirs = m_model->getSubDirectories(data->GetFullPath());
     sortSubDirectories(subDirs);
     for (const auto &subPath : subDirs) {
@@ -197,7 +195,7 @@ void MainFrame::onTreeSelChanged(wxTreeEvent &event) {
   }
 }
 
-void MainFrame::onListActivated(wxListEvent & /*event*/) {
+void MainFrame::onListActivated(wxListEvent &event) {
   long idx = m_list->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
   if (idx < 0)
     return;
@@ -225,7 +223,7 @@ void MainFrame::onColumnClick(wxListEvent &event) {
   updateListView(m_currentFiles, m_currentPath);
 }
 
-void MainFrame::onRefresh(wxCommandEvent & /*event*/) { doRefresh(); }
+void MainFrame::onRefresh(wxCommandEvent &event) { doRefresh(); }
 
 void MainFrame::doRefresh() {
   wxTreeItemId selId = m_tree->GetSelection();
@@ -236,7 +234,6 @@ void MainFrame::doRefresh() {
   if (!data)
     return;
 
-  // Nur aus der Map entfernen, wxTreeCtrl übernimmt das "delete" des Speichers!
   wxTreeItemIdValue cookie;
   wxTreeItemId child = m_tree->GetFirstChild(selId, cookie);
   while (child.IsOk()) {
@@ -259,7 +256,7 @@ void MainFrame::doRefresh() {
                  data->GetFullPath());
 }
 
-void MainFrame::onDelete(wxCommandEvent & /*event*/) { deleteSelectedItem(); }
+void MainFrame::onDelete(wxCommandEvent &event) { deleteSelectedItem(); }
 
 void MainFrame::deleteSelectedItem() {
   long idx = m_list->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);

@@ -7,7 +7,7 @@ class VileApp : public wxApp {
 
 public:
     bool OnInit() override {
-        auto *frame = new MainFrame("VileFile", &m_model);
+        auto *frame = new MainFrame("VileFile File Manager (v1.0)", &m_model);
         frame->setupColumns();
         frame->initializeTree(FileSystemModel::getRootPath());
         frame->Show(true);
