@@ -40,6 +40,8 @@ public:
                                           const std::string &b);
   static bool compareFileData(const FileData &a, const FileData &b,
                               int sortColumn, bool sortAscending);
+  static void pushHistoryEntry(std::vector<std::string> &history, size_t &pos,
+                               bool isNav, const std::string &path);
 
 private:
   void onTreeExpanding(wxTreeEvent &event);

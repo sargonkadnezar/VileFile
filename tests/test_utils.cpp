@@ -137,6 +137,55 @@ TEST_CASE("sort menu IDs map to correct columns") {
   CHECK(wxID_HIGHEST + 14 - (wxID_HIGHEST + 10) == 4);
 }
 
+TEST_CASE("history push truncates forward entries") {
+  std::vector<std::string> history = {"/"};
+  size_t pos = 0;
+
+  MainFrame::pushHistoryEntry(history, pos, false, "/home");
+  CHECK(history.size() == 2);
+  CHECK(pos == 1);
+  CHECK(history[1] == "/home");
+
+  MainFrame::pushHistoryEntry(history, pos, false, "/home/user");
+  CHECK(history.size() == 3);
+  CHECK(pos == 2);
+
+  pos = 0;
+  MainFrame::pushHistoryEntry(history, pos, false, "/etc");
+  CHECK(history.size() == 2);
+  CHECK(history[0] == "/");
+  CHECK(history[1] == "/etc");
+  CHECK(pos == 1);
+}
+
+TEST_CASE("history back/forward flag suppresses push") {
+  std::vector<std::string> history = {"/", "/home", "/home/user"};
+  size_t pos = 2;
+
+  MainFrame::pushHistoryEntry(history, pos, true, "/home");
+  CHECK(history.size() == 3);
+  CHECK(pos == 2);
+}
+
+TEST_CASE(".. double-click pushes parent and Back returns to child") {
+  std::vector<std::string> history = {"/"};
+  size_t pos = 0;
+
+  MainFrame::pushHistoryEntry(history, pos, false, "/boot");
+  CHECK(history.size() == 2);
+  CHECK(pos == 1);
+  CHECK(history[1] == "/boot");
+
+  MainFrame::pushHistoryEntry(history, pos, false, "/");
+  CHECK(history.size() == 3);
+  CHECK(pos == 2);
+
+  --pos;
+  MainFrame::pushHistoryEntry(history, pos, true, history[pos]);
+  CHECK(pos == 1);
+  CHECK(history[pos] == "/boot");
+}
+
 TEST_CASE("path traversal guard with fs::path operator/") {
   namespace fs = std::filesystem;
   fs::path base = "/home/user/docs";

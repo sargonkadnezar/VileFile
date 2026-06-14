@@ -219,15 +219,18 @@ void MainFrame::setupColumns() {
   m_list->InsertColumn(4, "Permissions", wxLIST_FORMAT_LEFT, 110);
 }
 
+void MainFrame::pushHistoryEntry(std::vector<std::string> &history,
+                                 size_t &pos, bool isNav,
+                                 const std::string &path) {
+  if (!isNav) {
+    history.resize(pos + 1);
+    history.push_back(path);
+    pos = history.size() - 1;
+  }
+}
+
 void MainFrame::navigateTo(const std::string &path) {
-  if (!m_isHistoryNavigation) {
-    m_navHistory.resize(m_navPos + 1);
-    m_navHistory.push_back(path);
-    m_navPos = m_navHistory.size() - 1;
-  }
-  if (auto it = m_pathToTreeItem.find(path); it != m_pathToTreeItem.end()) {
-    m_tree->SelectItem(it->second);
-  }
+  pushHistoryEntry(m_navHistory, m_navPos, m_isHistoryNavigation, path);
   updateListView(m_model->getDirectoryContents(path), path);
   updateToolbarState();
 }
@@ -341,6 +344,7 @@ void MainFrame::onTreeSelChanged(wxTreeEvent &event) {
           m_tree->GetItemData(event.GetItem()))) {
     navigateTo(data->GetFullPath());
   }
+  event.Skip();
 }
 
 void MainFrame::onListActivated(wxListEvent &event) {
@@ -355,10 +359,7 @@ void MainFrame::onListActivated(wxListEvent &event) {
   const auto &fd = m_currentFiles[fileIndex];
 
   if (fd.name == ".." || fd.isDirectory) {
-    if (auto it = m_pathToTreeItem.find(fd.fullPath);
-        it != m_pathToTreeItem.end()) {
-      m_tree->SelectItem(it->second);
-    }
+    navigateTo(fd.fullPath);
   } else {
     wxLaunchDefaultApplication(wxString(fd.fullPath));
   }
@@ -476,7 +477,7 @@ void MainFrame::onNavigateUp(wxCommandEvent &event) {
 void MainFrame::onNewFolder(wxCommandEvent &event) {
   wxTextEntryDialog dlg(this, "Enter folder name:", "New Folder");
   if (dlg.ShowModal() == wxID_OK) {
-    fs::path safe = fs::path(m_currentPath) / dlg.GetValue().ToStdString();
+    fs::path safe = fs::path(m_currentPath) / fs::path(dlg.GetValue().ToStdString()).filename();
     try {
       fs::create_directory(safe);
       doRefresh();
